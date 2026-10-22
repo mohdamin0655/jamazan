@@ -1,0 +1,1 @@
+V20.1 - Uji Mod Solat: countdown 10 saat, SILA RAPATKAN SAF 15 saat, kemudian kembali ke slideshow. Butang Uji/Hentikan dalam Panel Admin. Simulasi diselaraskan melalui konfigurasi LAN sedia ada. Sila backup APK/data dahulu dan uji pada telefon sebelum TV.

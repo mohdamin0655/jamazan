@@ -88,7 +88,11 @@ const overlay=document.createElement('div');overlay.id='v20solat';overlay.classN
 overlay.setAttribute('role','status');overlay.innerHTML='<div class="v20moon">☪</div><h2>SILA RAPATKAN SAF</h2><p id="v20prayer">Solat berjemaah sedang berlangsung</p><div class="v20small">Sila senyapkan telefon bimbit anda</div>';
 tv.appendChild(overlay);
 const settings=document.createElement('section');settings.id='v20solatsetup';
-settings.innerHTML='<h3>Mod Solat Automatik (V20)</h3><label><input type="checkbox" id="v20enabled"> Aktifkan Mod Solat selepas countdown iqamah tamat</label><label>Tempoh paparan Mod Solat (minit): <input type="number" id="v20duration" min="5" max="60" step="1" value="15"></label><label><input type="checkbox" id="v20friday" checked> Abaikan Mod Solat Zohor pada hari Jumaat (untuk elak gangguan khutbah)</label><p class="help">Paparan bertukar kepada SILA RAPATKAN SAF selepas tempoh iqamah. Fungsi hanya aktif jika jadual rasmi untuk tarikh hari ini telah diimport. Tetapan disimpan bersama konfigurasi Panel Admin.</p>';
+settings.innerHTML='<h3>Mod Solat Automatik (V20.1)</h3><label><input type="checkbox" id="v20enabled"> Aktifkan Mod Solat selepas countdown iqamah tamat</label><label>Tempoh paparan Mod Solat (minit): <input type="number" id="v20duration" min="5" max="60" step="1" value="15"></label><label><input type="checkbox" id="v20friday" checked> Abaikan Mod Solat Zohor pada hari Jumaat (untuk elak gangguan khutbah)</label><p class="help">Paparan bertukar kepada SILA RAPATKAN SAF selepas tempoh iqamah. Fungsi hanya aktif jika jadual rasmi untuk tarikh hari ini telah diimport. Tetapan disimpan bersama konfigurasi Panel Admin.</p>';
+// Ujian 10s countdown + 15s mod solat, synchronized through existing LAN config.
+const demo=document.createElement('div');demo.style.cssText='margin:12px 0;padding:12px;border:1px solid #b6d8ce;border-radius:10px';
+demo.innerHTML='<button type="button" id="v201test">▶ Uji Mod Solat (10s + 15s)</button> <button type="button" id="v201stop">Hentikan Ujian</button><p id="v201status" class="help">Ujian tidak mengubah jadual waktu solat atau tetapan iqamah.</p>';
+settings.appendChild(demo);
 const iq=$v('iqamahinputs');if(iq&&iq.parentElement)iq.parentElement.insertAdjacentElement('afterend',settings);else admin.appendChild(settings);
 function validSettings(){
  if(!data.solatMode||typeof data.solatMode!=='object')data.solatMode={enabled:true,duration:15,skipFridayZohor:true};
@@ -104,12 +108,31 @@ function collect(){const m=validSettings();m.enabled=$v('v20enabled').checked;m.
 const saveBtn=$v('save');if(saveBtn)saveBtn.addEventListener('click',collect,true);
 const adminBtn=$v('adminbtn');if(adminBtn)adminBtn.addEventListener('click',()=>setTimeout(fill,0));
 const originalFill=window.fillAdmin;if(typeof originalFill==='function')window.fillAdmin=function(){originalFill();fill()};
+function runDemo(stop){
+ const m=validSettings();m.demoStart=stop?0:Date.now()+1500;
+ // Use existing save mechanism so Android TV receives the same state through /api/config.
+ // Collect current admin controls first, but do not modify prayer schedule or iqamah.
+ collect();
+ try{saveData()}catch(e){$v('v201status').textContent='Gagal menyimpan ujian: '+e.message;return}
+ $v('v201status').textContent=stop?'Ujian dihentikan.':'Ujian dihantar. Countdown bermula dalam 1–4 saat pada paparan TV.';
+}
+$v('v201test').addEventListener('click',()=>runDemo(false));
+$v('v201stop').addEventListener('click',()=>runDemo(true));
 function localDateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function update(){
  try{
   const now=new Date(),day=data.schedule&&data.schedule[localDateKey(now)],m=validSettings();
-  if(!day||!m.enabled){overlay.classList.add('hidden');return}
-  const secs=now.getHours()*3600+now.getMinutes()*60+now.getSeconds();
+  const demoStart=Number(m.demoStart)||0,elapsed=Date.now()-demoStart;
+  if(demoStart>0&&elapsed>=0&&elapsed<25000){
+   const countdown=elapsed<10000;
+   overlay.classList.remove('hidden');
+   overlay.querySelector('h2').textContent=countdown?'UJIAN IQAMAH':'SILA RAPATKAN SAF';
+   $v('v20prayer').textContent=countdown?'Mod Solat bermula dalam '+Math.max(0,Math.ceil((10000-elapsed)/1000))+' saat':'SIMULASI — Solat berjemaah';
+   return;
+  }
+  overlay.querySelector('h2').textContent='SILA RAPATKAN SAF';
+  if(demoStart>0&&elapsed>=25000&&elapsed<30000)$v('v201status').textContent='Ujian selesai. Slideshow kembali seperti biasa.';
+const secs=now.getHours()*3600+now.getMinutes()*60+now.getSeconds();
   let active=null;
   for(const name of ['Subuh','Zohor','Asar','Maghrib','Isyak']){
    if(name==='Zohor'&&now.getDay()===5&&m.skipFridayZohor)continue;
